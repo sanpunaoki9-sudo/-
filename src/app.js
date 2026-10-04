@@ -11,6 +11,25 @@ let editingId = null;
 let draftPhotos = [];
 let hiddenAt = 0;
 let toastTimer;
+let wari = null;
+
+// 選んだ割合は覚えておき、元金を後から入れても利息欄に反映する。
+function applyWari() {
+  if (!wari) return;
+  const principal = validMoney($('principal'));
+  $('interest').value = principal === null ? '' : Math.round(principal * wari / 10);
+}
+function selectWari(value) {
+  wari = value;
+  for (const button of document.querySelectorAll('[data-wari]')) {
+    const on = Number(button.dataset.wari) === wari;
+    button.classList.toggle('button-primary', on);
+    button.classList.toggle('button-outline', !on);
+    button.setAttribute('aria-pressed', String(on));
+  }
+  applyWari();
+  updateFormTotal();
+}
 
 function toast(message) {
   $('toast').textContent = message;
@@ -185,6 +204,7 @@ function openRecord(id = null) {
   $('lent-date').value = record?.lentDate || localDate();
   $('due-date').value = record?.dueDate || '';
   $('memo').value = record?.memo || '';
+  selectWari(null);
   draftPhotos = structuredClone(record?.photos || []);
   renderPhotos(); renderHistory(record?.dueHistory || []); updateFormTotal();
   $('record-dialog').showModal();
@@ -280,7 +300,9 @@ function wireEvents() {
   $('new-button').addEventListener('click', () => openRecord());
   $('record-close').addEventListener('click', () => $('record-dialog').close());
   $('record-form').addEventListener('submit', saveRecord);
-  for (const button of document.querySelectorAll('[data-wari]')) button.addEventListener('click', () => { const principal = validMoney($('principal')); if (!principal) { toast('先に元金を入力してください'); return; } $('interest').value = Math.round(principal * Number(button.dataset.wari) / 10); updateFormTotal(); });
+  for (const button of document.querySelectorAll('[data-wari]')) button.addEventListener('click', () => { const value = Number(button.dataset.wari); selectWari(wari === value ? null : value); if (wari && validMoney($('principal')) === null) toast(`${wari}割を選びました。元金を入れると利息が入ります`); });
+  $('principal').addEventListener('input', () => { applyWari(); updateFormTotal(); });
+  $('interest').addEventListener('input', () => selectWari(null));
   $('shift-month').addEventListener('click', () => { if (!$('due-date').value) { toast('先に返済日を入力してください'); return; } $('due-date').value = nextMonth($('due-date').value); updateFormTotal(); toast('返済日を来月にしました。「保存する」で確定します'); });
   $('photo-input').addEventListener('change', addPhotos);
   $('delete-record').addEventListener('click', async () => { const record = records.find(item => item.id === editingId); if (!record || !window.confirm(`「${record.person}」の記録を削除しますか？`)) return; try { await persist(records.filter(item => item.id !== editingId)); $('record-dialog').close(); toast('削除しました'); } catch(error) { toast(errorMessage(error, '削除できませんでした')); } });
