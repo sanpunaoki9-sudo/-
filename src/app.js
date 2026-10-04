@@ -131,7 +131,27 @@ function renderRecords() {
     card.append(person, amount, due, arrow);
     card.addEventListener('click', () => openRecord(record.id));
     container.append(card);
+    if (record.dueDate <= localDate()) {
+      const shift = document.createElement('button');
+      shift.type = 'button'; shift.className = 'button button-outline shift-button'; shift.textContent = `返済日を来月（${displayDate(nextMonth(record.dueDate))}）にずらす`;
+      shift.addEventListener('click', () => shiftToNextMonth(record.id));
+      container.append(shift);
+    }
   }
+}
+function nextMonth(date) {
+  const [year, month, day] = date.split('-').map(Number);
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(year, month, Math.min(day, lastDay))).toISOString().slice(0, 10);
+}
+async function shiftToNextMonth(id) {
+  const record = records.find(item => item.id === id);
+  if (!record) return;
+  const to = nextMonth(record.dueDate);
+  if (!window.confirm(`「${record.person}」の返済日を ${displayDate(record.dueDate)} から ${displayDate(to)} にずらしますか？`)) return;
+  const updated = { ...record, dueDate: to, dueHistory: [...(record.dueHistory || []), { from: record.dueDate, to, changedAt: new Date().toISOString() }] };
+  try { await persist(records.map(item => item.id === id ? updated : item)); toast('返済日を来月にずらしました'); }
+  catch (error) { toast(`保存できませんでした: ${errorMessage(error, '容量を確認してください')}`); }
 }
 
 function renderPhotos() {
@@ -147,7 +167,7 @@ function renderPhotos() {
 function renderHistory(history = []) {
   $('due-history-wrap').hidden = history.length === 0;
   const container = $('due-history'); container.replaceChildren();
-  for (const entry of history) { const row = document.createElement('div'); row.textContent = `${displayDate(entry.from)} → ${displayDate(entry.to)}（${displayDate(entry.changedAt.slice(0,10))}）`; container.append(row); }
+  for (const entry of history) { const row = document.createElement('div'); row.textContent = `${displayDate(entry.from)} → ${displayDate(entry.to)}（${displayDate(localDate(new Date(entry.changedAt)))}）`; container.append(row); }
 }
 function openRecord(id = null) {
   editingId = id;
@@ -260,6 +280,7 @@ function wireEvents() {
   $('record-form').addEventListener('submit', saveRecord);
   $('use-calculation').addEventListener('click', () => { const result = calculation(); if (!result) { toast('先に計算機へ元金・利率・期間を入力してください'); return; } $('principal').value = result.principal; $('interest').value = result.interest; updateFormTotal(); toast('計算結果を入力しました'); });
   for (const button of document.querySelectorAll('[data-wari]')) button.addEventListener('click', () => { const principal = validMoney($('principal')); if (!principal) { toast('先に元金を入力してください'); return; } $('interest').value = Math.round(principal * Number(button.dataset.wari) / 10); updateFormTotal(); });
+  $('shift-month').addEventListener('click', () => { if (!$('due-date').value) { toast('先に返済日を入力してください'); return; } $('due-date').value = nextMonth($('due-date').value); updateFormTotal(); toast('返済日を来月にしました。「保存する」で確定します'); });
   $('photo-input').addEventListener('change', addPhotos);
   $('delete-record').addEventListener('click', async () => { const record = records.find(item => item.id === editingId); if (!record || !window.confirm(`「${record.person}」の記録を削除しますか？`)) return; try { await persist(records.filter(item => item.id !== editingId)); $('record-dialog').close(); toast('削除しました'); } catch(error) { toast(errorMessage(error, '削除できませんでした')); } });
   $('settings-open').addEventListener('click', () => { updateFaceButton(); $('settings-dialog').showModal(); });
