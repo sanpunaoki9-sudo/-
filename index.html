@@ -52,12 +52,12 @@
         <div class="section-heading"><div><p class="eyebrow">QUICK CALCULATOR</p><h2 id="calc-title">利息の計算機</h2></div><span class="section-symbol">01</span></div>
         <div class="calc-grid">
           <label>元金 <span class="input-unit"><input id="calc-principal" type="number" inputmode="decimal" min="0" step="any" placeholder="例 100000"><span>円</span></span></label>
-          <label>利率 <span class="input-unit"><input id="calc-rate" type="number" inputmode="decimal" min="0" step="any" placeholder="例 2"><span>％</span></span></label>
+          <label>利率 <select id="calc-rate"><option value="10">1割</option><option value="20">2割</option><option value="30">3割</option></select></label>
           <label>計算方法 <select id="calc-mode"><option value="daily">日割り</option><option value="monthly">月割り</option></select></label>
           <label>期間 <span class="input-unit"><input id="calc-period" type="number" inputmode="decimal" min="0" step="any" placeholder="例 30"><span id="calc-period-unit">日</span></span></label>
         </div>
         <div class="calc-result"><div><small>計算した利息</small><strong id="calc-interest">—</strong></div><div><small>元金と利息の合計</small><strong id="calc-total">—</strong></div></div>
-        <p class="hint">入力した利率を、選択した1日または1か月あたりの利率として計算します。端数は1円未満を四捨五入します。</p>
+        <p class="hint">選んだ割合（1割＝10％）を、選択した1日または1か月あたりの利率として計算します。端数は1円未満を四捨五入します。</p>
       </section>
 
       <section class="records" aria-labelledby="records-title">
@@ -74,6 +74,7 @@
     <label>貸した人の名前 <input id="person" type="text" autocomplete="off" maxlength="100" required placeholder="名前を入力"></label>
     <label>よみがな <span class="optional">任意・あいうえお順用</span><input id="reading" type="text" maxlength="100" placeholder="例 やまだ たろう"></label>
     <div class="form-row"><label>元金 <span class="input-unit"><input id="principal" type="number" inputmode="decimal" min="0" step="any" required placeholder="0"><span>円</span></span></label><label><span id="interest-label">利息</span> <span class="input-unit"><input id="interest" type="number" inputmode="decimal" min="0" step="any" required placeholder="0"><span>円</span></span></label></div>
+    <div class="wari-row"><button class="button button-outline small" type="button" data-wari="1">1割</button><button class="button button-outline small" type="button" data-wari="2">2割</button><button class="button button-outline small" type="button" data-wari="3">3割</button></div><p class="hint">元金の1割・2割・3割を利息欄に入力します。入力後も金額は自由に変更できます。</p>
     <label>何日ごとに利息が増える？ <span class="optional">任意</span><span class="input-unit"><input id="interest-interval" type="number" inputmode="numeric" min="1" step="1" placeholder="例 10"><span>日ごと</span></span></label><p class="hint">設定した日数が経過するたび、利息欄の金額を1回分として加算します。</p>
     <button id="use-calculation" class="button button-outline small" type="button">計算機の結果を入力</button>
     <div class="form-row"><label>貸した日 <input id="lent-date" type="date" readonly></label><label>返済日 <input id="due-date" type="date" required></label></div><p class="hint">返済日を変更すると、延長前の日付が履歴に残ります。</p>
