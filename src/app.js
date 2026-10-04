@@ -259,6 +259,7 @@ function wireEvents() {
   $('record-close').addEventListener('click', () => $('record-dialog').close());
   $('record-form').addEventListener('submit', saveRecord);
   $('use-calculation').addEventListener('click', () => { const result = calculation(); if (!result) { toast('先に計算機へ元金・利率・期間を入力してください'); return; } $('principal').value = result.principal; $('interest').value = result.interest; updateFormTotal(); toast('計算結果を入力しました'); });
+  for (const button of document.querySelectorAll('[data-wari]')) button.addEventListener('click', () => { const principal = validMoney($('principal')); if (!principal) { toast('先に元金を入力してください'); return; } $('interest').value = Math.round(principal * Number(button.dataset.wari) / 10); updateFormTotal(); });
   $('photo-input').addEventListener('change', addPhotos);
   $('delete-record').addEventListener('click', async () => { const record = records.find(item => item.id === editingId); if (!record || !window.confirm(`「${record.person}」の記録を削除しますか？`)) return; try { await persist(records.filter(item => item.id !== editingId)); $('record-dialog').close(); toast('削除しました'); } catch(error) { toast(errorMessage(error, '削除できませんでした')); } });
   $('settings-open').addEventListener('click', () => { updateFaceButton(); $('settings-dialog').showModal(); });
