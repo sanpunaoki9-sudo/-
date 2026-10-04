@@ -273,7 +273,7 @@ function wireEvents() {
 async function start() {
   if (!secureAvailable()) { $('auth-description').textContent = 'HTTPSまたはlocalhostで開いてください。この環境では暗号化保存を使用できません。'; $('auth-form').hidden = true; return; }
   wireEvents();
-  for (const [from, to] of [['15','10'],['10','7'],['8','5'],['5.5','3.8'],['5','3'],['3','２'],['2','1']]) {
+  for (const [from, to] of [['15','10'],['10','7'],['8','5'],['5.5','3.8'],['5','3'],['3','2'],['2','1']]) {
     const row = document.createElement('div'); row.className = 'rate-row';
     const left = document.createElement('span'); left.textContent = `${from}枠`;
     const right = document.createElement('span'); right.textContent = `▷▶︎▷ ${to}`;
