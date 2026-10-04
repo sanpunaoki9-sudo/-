@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0c0c">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+  <meta name="description" content="貸付と返済日を、端末内で暗号化して管理するアプリ。">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icon.svg">
+  <link rel="stylesheet" href="./styles.css">
+  <title>貸付メモ</title>
+</head>
+<body>
+  <div id="auth-screen" class="auth-screen">
+    <div class="auth-card">
+      <div class="hazard-line" aria-hidden="true"><span>KEEP OUT · CAUTION · KEEP OUT · CAUTION</span></div>
+      <div class="brand-mark" aria-hidden="true">¥</div>
+      <p class="eyebrow">PRIVATE LOAN LOG</p>
+      <h1>貸付メモ</h1>
+      <p id="auth-description" class="muted">この端末に保存する記録を、パスワードで保護します。</p>
+      <form id="auth-form">
+        <label for="password">パスワード</label>
+        <input id="password" type="password" autocomplete="current-password" minlength="8" required placeholder="8文字以上">
+        <div id="confirm-wrap" hidden>
+          <label for="password-confirm">パスワードを再入力</label>
+          <input id="password-confirm" type="password" autocomplete="new-password" placeholder="もう一度入力">
+        </div>
+        <button id="auth-submit" class="button button-primary full" type="submit">開く</button>
+      </form>
+      <button id="face-unlock" class="button button-outline full" type="button" hidden>Face IDで開く</button>
+      <p id="auth-error" class="error" role="alert"></p>
+      <p class="auth-footnote">記録・写真は暗号化してこの端末内に保存されます。iPhoneではホーム画面に追加してから初期設定してください。</p>
+    </div>
+  </div>
+
+  <div id="app" class="app" hidden>
+    <header class="app-header">
+      <div class="header-inner">
+        <div class="brand"><span class="brand-icon">¥</span><span><strong>貸付メモ</strong><small>PRIVATE LOAN LOG</small></span></div>
+        <div class="header-actions">
+          <button id="settings-open" class="icon-button" type="button" aria-label="設定">⚙</button>
+          <button id="lock-button" class="icon-button" type="button" aria-label="ロック">⌑</button>
+        </div>
+      </div>
+      <div class="header-tape" aria-hidden="true">CAUTION　/　KEEP OUT　/　CAUTION　/　KEEP OUT</div>
+    </header>
+
+    <main class="shell">
+      <section class="calculator panel" aria-labelledby="calc-title">
+        <div class="section-heading"><div><p class="eyebrow">QUICK CALCULATOR</p><h2 id="calc-title">利息の計算機</h2></div><span class="section-symbol">01</span></div>
+        <div class="calc-grid">
+          <label>元金 <span class="input-unit"><input id="calc-principal" type="number" inputmode="decimal" min="0" step="any" placeholder="例 100000"><span>円</span></span></label>
+          <label>利率 <span class="input-unit"><input id="calc-rate" type="number" inputmode="decimal" min="0" step="any" placeholder="例 2"><span>％</span></span></label>
+          <label>計算方法 <select id="calc-mode"><option value="daily">日割り</option><option value="monthly">月割り</option></select></label>
+          <label>期間 <span class="input-unit"><input id="calc-period" type="number" inputmode="decimal" min="0" step="any" placeholder="例 30"><span id="calc-period-unit">日</span></span></label>
+        </div>
+        <div class="calc-result"><div><small>計算した利息</small><strong id="calc-interest">—</strong></div><div><small>元金と利息の合計</small><strong id="calc-total">—</strong></div></div>
+        <p class="hint">入力した利率を、選択した1日または1か月あたりの利率として計算します。端数は1円未満を四捨五入します。</p>
+      </section>
+
+      <section class="records" aria-labelledby="records-title">
+        <div class="list-heading"><div><p class="eyebrow">YOUR RECORDS</p><h2 id="records-title">貸した人の一覧 <span id="record-count">0</span></h2></div><button id="new-button" class="button button-primary" type="button">＋ 新しく記録</button></div>
+        <div class="toolbar"><label class="search-wrap"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="名前で検索" aria-label="名前で検索"></label><select id="sort" aria-label="並び順"><option value="due">返済日が近い順</option><option value="name">あいうえお順</option></select></div>
+        <div id="record-list" class="record-list"></div>
+      </section>
+
+      <section class="rate-table panel" aria-labelledby="table-title"><div class="section-heading"><div><p class="eyebrow">REFERENCE</p><h2 id="table-title">枠の一覧</h2></div><span class="section-symbol">02</span></div><div id="rate-rows" class="rate-rows"></div></section>
+    </main>
+  </div>
+
+  <dialog id="record-dialog" class="sheet"><form id="record-form" method="dialog" autocomplete="off"><div class="sheet-header"><div><p class="eyebrow">LOAN RECORD</p><h2 id="record-dialog-title">新しい記録</h2></div><button id="record-close" class="icon-button" type="button" aria-label="閉じる">×</button></div><div class="sheet-body">
+    <label>貸した人の名前 <input id="person" type="text" autocomplete="off" maxlength="100" required placeholder="名前を入力"></label>
+    <label>よみがな <span class="optional">任意・あいうえお順用</span><input id="reading" type="text" maxlength="100" placeholder="例 やまだ たろう"></label>
+    <div class="form-row"><label>元金 <span class="input-unit"><input id="principal" type="number" inputmode="decimal" min="0" step="any" required placeholder="0"><span>円</span></span></label><label>利息 <span class="input-unit"><input id="interest" type="number" inputmode="decimal" min="0" step="any" required placeholder="0"><span>円</span></span></label></div>
+    <button id="use-calculation" class="button button-outline small" type="button">計算機の結果を入力</button>
+    <div class="form-row"><label>貸した日 <input id="lent-date" type="date" readonly></label><label>返済日 <input id="due-date" type="date" required></label></div><p class="hint">返済日を変更すると、延長前の日付が履歴に残ります。</p>
+    <div class="form-total"><span>元金＋利息</span><strong id="form-total">¥0</strong></div>
+    <label>自由メモ <textarea id="memo" rows="4" placeholder="返済の約束や補足など"></textarea></label>
+    <label class="photo-label">写真 <span class="optional">最大4枚</span><input id="photo-input" type="file" accept="image/*" multiple></label><div id="photo-preview" class="photo-preview"></div>
+    <div id="due-history-wrap" hidden><h3>返済日の変更履歴</h3><div id="due-history" class="history-list"></div></div>
+  </div><div class="sheet-footer"><button id="delete-record" class="button button-danger" type="button" hidden>削除</button><button class="button button-primary" type="submit">保存する</button></div></form></dialog>
+
+  <dialog id="settings-dialog" class="sheet narrow"><div class="sheet-header"><div><p class="eyebrow">SECURITY & DATA</p><h2>設定</h2></div><button id="settings-close" class="icon-button" type="button" aria-label="閉じる">×</button></div><div class="sheet-body settings-body"><div class="setting-row"><div><strong>Face IDで開く</strong><p>対応するiPhoneで、パスワードの代わりに解除します。</p></div><button id="face-toggle" class="button button-outline small" type="button">設定する</button></div><div class="setting-row"><div><strong>暗号化バックアップ</strong><p>パスワードで保護された記録をファイルに保存します。</p></div><button id="export-button" class="button button-outline small" type="button">書き出す</button></div><div class="setting-row"><div><strong>バックアップを復元</strong><p>現在の記録を置き換えます。</p></div><button id="import-button" class="button button-outline small" type="button">読み込む</button><input id="import-input" type="file" accept="application/json,.json" hidden></div><p class="hint">パスワードを忘れると記録を復元できません。Face IDの利用状況は端末とブラウザの対応によって異なります。</p></div></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
