@@ -77,6 +77,7 @@ function updateFormTotal() {
     lentDate: $('lent-date').value, dueDate: $('due-date').value
   });
   $('form-total').textContent = yen(summary.total);
+  $('form-interest').textContent = yen(summary.accruedInterest);
   $('interest-label').textContent = summary.cycles === null ? '利息' : '利息（1回あたり）';
   $('form-total-label').textContent = summary.cycles === null ? '元金＋利息' : `返済日までの合計（利息 ${summary.cycles}回）`;
   $('form-total-detail').textContent = summary.cycles === null ? '' : `${summary.elapsedDays}日間 ÷ ${$('interest-interval').value}日ごと → ${summary.cycles}回加算、利息合計 ${yen(summary.accruedInterest)}`;
@@ -175,6 +176,7 @@ function openRecord(id = null) {
   const record = records.find(item => item.id === id);
   $('record-dialog-title').textContent = record ? '記録を編集' : '新しい記録';
   $('delete-record').hidden = !record;
+  $('shift-month').hidden = !(record && record.dueDate <= localDate());
   $('person').value = record?.person || '';
   $('reading').value = record?.reading || '';
   $('principal').value = record?.principal ?? '';
@@ -278,7 +280,6 @@ function wireEvents() {
   $('new-button').addEventListener('click', () => openRecord());
   $('record-close').addEventListener('click', () => $('record-dialog').close());
   $('record-form').addEventListener('submit', saveRecord);
-  $('use-calculation').addEventListener('click', () => { const result = calculation(); if (!result) { toast('先に計算機へ元金・利率・期間を入力してください'); return; } $('principal').value = result.principal; $('interest').value = result.interest; updateFormTotal(); toast('計算結果を入力しました'); });
   for (const button of document.querySelectorAll('[data-wari]')) button.addEventListener('click', () => { const principal = validMoney($('principal')); if (!principal) { toast('先に元金を入力してください'); return; } $('interest').value = Math.round(principal * Number(button.dataset.wari) / 10); updateFormTotal(); });
   $('shift-month').addEventListener('click', () => { if (!$('due-date').value) { toast('先に返済日を入力してください'); return; } $('due-date').value = nextMonth($('due-date').value); updateFormTotal(); toast('返済日を来月にしました。「保存する」で確定します'); });
   $('photo-input').addEventListener('change', addPhotos);
