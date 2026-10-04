@@ -1,4 +1,5 @@
 import { getMeta, initialize, unlockWithPassword, unlockWithBiometric, saveRecords, enableBiometric, disableBiometric, exportBackup, restoreBackup } from './vault.js';
+import { loanSummary } from './loanMath.js';
 
 const $ = id => document.getElementById(id);
 const yen = value => `¥${Math.round(value).toLocaleString('ja-JP')}`;
@@ -69,7 +70,17 @@ function updateCalculator() {
   $('calc-interest').textContent = result ? yen(result.interest) : '—';
   $('calc-total').textContent = result ? yen(result.total) : '—';
 }
-function updateFormTotal() { $('form-total').textContent = yen(Number($('principal').value || 0) + Number($('interest').value || 0)); }
+function updateFormTotal() {
+  const summary = loanSummary({
+    principal: Number($('principal').value || 0), interest: Number($('interest').value || 0),
+    interestIntervalDays: $('interest-interval').value || null,
+    lentDate: $('lent-date').value, dueDate: $('due-date').value
+  });
+  $('form-total').textContent = yen(summary.total);
+  $('interest-label').textContent = summary.cycles === null ? '利息' : '利息（1回あたり）';
+  $('form-total-label').textContent = summary.cycles === null ? '元金＋利息' : `返済日までの合計（利息 ${summary.cycles}回）`;
+  $('form-total-detail').textContent = summary.cycles === null ? '' : `${summary.elapsedDays}日間 ÷ ${$('interest-interval').value}日ごと → ${summary.cycles}回加算、利息合計 ${yen(summary.accruedInterest)}`;
+}
 
 function dueBadge(date) {
   const days = Math.ceil((new Date(`${date}T00:00:00`) - new Date(`${localDate()}T00:00:00`)) / 86400000);
@@ -102,12 +113,14 @@ function renderRecords() {
     card.type = 'button'; card.className = 'record-card';
     const person = document.createElement('div'); person.className = 'person-cell';
     const name = document.createElement('strong'); name.textContent = record.person;
-    const lent = document.createElement('small'); lent.textContent = `貸した日 ${displayDate(record.lentDate)}`;
+    const lent = document.createElement('small'); lent.textContent = `貸した日 ${displayDate(record.lentDate)}${record.interestIntervalDays ? ` · 利息 ${record.interestIntervalDays}日ごと` : ''}`;
     person.append(name, lent);
     const amount = document.createElement('div');
     const amountCaption = document.createElement('small'); amountCaption.textContent = '元金＋利息';
-    const amountValue = document.createElement('div'); amountValue.className = 'amount total'; amountValue.textContent = yen(record.principal + record.interest);
+    const summary = loanSummary(record);
+    const amountValue = document.createElement('div'); amountValue.className = 'amount total'; amountValue.textContent = yen(summary.total);
     amount.append(amountCaption, amountValue);
+    if (summary.cycles !== null) { const times = document.createElement('small'); times.textContent = `利息 ${summary.cycles}回 · ${yen(summary.accruedInterest)}`; amount.append(times); }
     const due = document.createElement('div');
     const dueCaption = document.createElement('small'); dueCaption.textContent = '返済日';
     const dueValue = document.createElement('div'); dueValue.className = 'amount'; dueValue.textContent = displayDate(record.dueDate);
@@ -146,6 +159,7 @@ function openRecord(id = null) {
   $('reading').value = record?.reading || '';
   $('principal').value = record?.principal ?? '';
   $('interest').value = record?.interest ?? '';
+  $('interest-interval').value = record?.interestIntervalDays ?? '';
   $('lent-date').value = record?.lentDate || localDate();
   $('due-date').value = record?.dueDate || '';
   $('memo').value = record?.memo || '';
@@ -160,12 +174,14 @@ async function saveRecord(event) {
   const person = $('person').value.trim();
   const principal = validMoney($('principal'));
   const interest = validMoney($('interest'));
+  const intervalInput = $('interest-interval').value.trim();
+  const interestIntervalDays = intervalInput === '' ? null : Number(intervalInput);
   const dueDate = $('due-date').value;
-  if (!person || principal === null || interest === null || !dueDate) { toast('名前・金額・返済日を確認してください'); return; }
+  if (!person || principal === null || interest === null || !dueDate || (interestIntervalDays !== null && (!Number.isSafeInteger(interestIntervalDays) || interestIntervalDays < 1))) { toast('名前・金額・日数・返済日を確認してください'); return; }
   const previous = records.find(item => item.id === editingId);
   const dueHistory = [...(previous?.dueHistory || [])];
   if (previous && previous.dueDate !== dueDate) dueHistory.push({ from: previous.dueDate, to: dueDate, changedAt: new Date().toISOString() });
-  const record = { id: previous?.id || crypto.randomUUID(), person, reading: $('reading').value.trim(), principal, interest, lentDate: previous?.lentDate || localDate(), dueDate, memo: $('memo').value, photos: draftPhotos, dueHistory, createdAt: previous?.createdAt || new Date().toISOString() };
+  const record = { id: previous?.id || crypto.randomUUID(), person, reading: $('reading').value.trim(), principal, interest, interestIntervalDays, lentDate: previous?.lentDate || localDate(), dueDate, memo: $('memo').value, photos: draftPhotos, dueHistory, createdAt: previous?.createdAt || new Date().toISOString() };
   const next = previous ? records.map(item => item.id === record.id ? record : item) : [...records, record];
   try { await persist(next); $('record-dialog').close(); draftPhotos = []; toast('保存しました'); }
   catch (error) { toast(`保存できませんでした: ${errorMessage(error, '容量を確認してください')}`); }
@@ -236,7 +252,8 @@ function wireEvents() {
   });
   $('face-unlock').addEventListener('click', async () => { const button = $('face-unlock'); button.disabled = true; try { openApp(await unlockWithBiometric()); toast('ロックを解除しました'); } catch(error) { $('auth-error').textContent = errorMessage(error, 'Face IDで開けませんでした'); } finally { button.disabled = false; } });
   for (const id of ['calc-principal','calc-rate','calc-period','calc-mode']) $(id).addEventListener('input', updateCalculator);
-  for (const id of ['principal','interest']) $(id).addEventListener('input', updateFormTotal);
+  for (const id of ['principal','interest','interest-interval','due-date']) $(id).addEventListener('input', updateFormTotal);
+  $('due-date').addEventListener('change', updateFormTotal);
   $('search').addEventListener('input', renderRecords); $('sort').addEventListener('change', renderRecords);
   $('new-button').addEventListener('click', () => openRecord());
   $('record-close').addEventListener('click', () => $('record-dialog').close());
