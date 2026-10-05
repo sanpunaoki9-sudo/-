@@ -1,4 +1,4 @@
-import { getMeta, initialize, unlockWithPassword, unlockWithBiometric, saveRecords, enableBiometric, disableBiometric, exportBackup, restoreBackup } from './vault.js';
+import { getMeta, initialize, unlockWithPassword, unlockWithBiometric, saveRecords, enableBiometric, disableBiometric, exportBackup, restoreBackup, changePassword, setPasswordLock, unlockWithoutPassword } from './vault.js?v=9';
 import { loanSummary } from './loanMath.js';
 
 const $ = id => document.getElementById(id);
@@ -12,6 +12,7 @@ let draftPhotos = [];
 let hiddenAt = 0;
 let toastTimer;
 let wari = null;
+let lockOff = false;
 
 // 選んだ割合は覚えておき、元金を後から入れても利息欄に反映する。
 function applyWari() {
@@ -62,6 +63,35 @@ function openApp(result) {
   $('auth-error').textContent = '';
   renderRecords();
   updateFaceButton();
+  updateLockSetting();
+}
+async function updateLockSetting() {
+  const meta = await getMeta();
+  lockOff = Boolean(meta?.openKey);
+  $('lock-toggle').textContent = lockOff ? 'オンにする' : 'オフにする';
+  $('lock-status').textContent = lockOff ? 'オフです。パスワードなしで開きます。' : '開くときにパスワードを求めます。';
+  $('lock-button').hidden = lockOff;
+}
+async function toggleLock() {
+  const button = $('lock-toggle'); button.disabled = true;
+  try {
+    if (!lockOff && !window.confirm('パスワードロックをオフにすると、この端末を開ける人は誰でも記録を見られます。オフにしますか？')) return;
+    await setPasswordLock(master, lockOff);
+    await updateLockSetting();
+    toast(lockOff ? 'パスワードロックをオフにしました' : 'パスワードロックをオンにしました');
+  } catch(error) { toast(errorMessage(error, '設定を変更できませんでした')); }
+  finally { button.disabled = false; }
+}
+async function submitNewPassword(event) {
+  event.preventDefault();
+  const password = $('new-password').value;
+  if (password.length < 8) { $('password-error').textContent = 'パスワードは8文字以上にしてください'; return; }
+  if (password !== $('new-password-confirm').value) { $('password-error').textContent = 'パスワードが一致しません'; return; }
+  try {
+    await changePassword(master, password);
+    $('password-form').reset(); $('password-form').hidden = true; $('password-error').textContent = '';
+    toast('パスワードを変更しました');
+  } catch(error) { $('password-error').textContent = errorMessage(error, '変更できませんでした'); }
 }
 function lock() {
   master = null;
@@ -313,7 +343,10 @@ function wireEvents() {
   $('import-button').addEventListener('click', () => $('import-input').click());
   $('import-input').addEventListener('change', importBackup);
   $('lock-button').addEventListener('click', lock);
-  document.addEventListener('visibilitychange', () => { if (document.hidden) hiddenAt = Date.now(); else if (master && hiddenAt && Date.now() - hiddenAt > 60000) lock(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) hiddenAt = Date.now(); else if (master && !lockOff && hiddenAt && Date.now() - hiddenAt > 60000) lock(); });
+  $('lock-toggle').addEventListener('click', toggleLock);
+  $('password-open').addEventListener('click', () => { $('password-form').hidden = !$('password-form').hidden; $('password-error').textContent = ''; if (!$('password-form').hidden) $('new-password').focus(); });
+  $('password-form').addEventListener('submit', submitNewPassword);
 }
 async function start() {
   if (!secureAvailable()) { $('auth-description').textContent = 'HTTPSまたはlocalhostで開いてください。この環境では暗号化保存を使用できません。'; $('auth-form').hidden = true; return; }
@@ -325,7 +358,12 @@ async function start() {
     row.append(left, right); $('rate-rows').append(row);
   }
   updateCalculator();
-  try { await showAuth(); } catch(error) { $('auth-description').textContent = errorMessage(error, '保存領域を開けませんでした'); $('auth-form').hidden = true; }
+  try {
+    const meta = await getMeta();
+    let opened = false;
+    if (meta?.openKey) { try { openApp(await unlockWithoutPassword()); opened = true; } catch { /* 開けなければパスワード画面へ */ } }
+    if (!opened) await showAuth();
+  } catch(error) { $('auth-description').textContent = errorMessage(error, '保存領域を開けませんでした'); $('auth-form').hidden = true; }
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
 start();

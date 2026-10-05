@@ -83,7 +83,7 @@ export async function saveRecords(master, records) {
 }
 export async function exportBackup() {
   const [meta, vault] = await Promise.all([read('meta'), read('vault')]);
-  const { biometricId, biometricSalt, biometricWrap, ...passwordMeta } = meta;
+  const { biometricId, biometricSalt, biometricWrap, openKey, ...passwordMeta } = meta;
   return { format: 'kashitsuke-memo-backup', version: 1, meta: passwordMeta, vault };
 }
 export async function restoreBackup(backup, password) {
@@ -131,5 +131,24 @@ export async function unlockWithBiometric() {
   if (!meta?.biometricId) throw new Error('Face IDは設定されていません');
   const secret = await credentialSecret(meta.biometricId, meta.biometricSalt);
   const master = await decrypt(meta.biometricWrap, secret);
+  return { master, records: await decryptVault(master) };
+}
+
+// パスワードの再設定: 解除中のデータ鍵を新しいパスワードで包み直す。記録そのものは書き換えない。
+export async function changePassword(master, password) {
+  const meta = await getMeta();
+  const salt = bytesToBase64(randomBytes(16));
+  await write({ meta: { ...meta, salt, iterations: ITERATIONS, passwordWrap: await encrypt(master, await passwordKey(password, salt)) } });
+}
+// パスワードロックをオフにすると、データ鍵を端末内にそのまま置き、パスワードなしで開けるようにする。
+export async function setPasswordLock(master, enabled) {
+  const meta = await getMeta();
+  const { openKey, ...locked } = meta;
+  await write({ meta: enabled ? locked : { ...locked, openKey: bytesToBase64(master) } });
+}
+export async function unlockWithoutPassword() {
+  const meta = await getMeta();
+  if (!meta?.openKey) throw new Error('パスワードロックがオンです');
+  const master = base64ToBytes(meta.openKey);
   return { master, records: await decryptVault(master) };
 }
