@@ -152,3 +152,13 @@ export async function unlockWithoutPassword() {
   const master = base64ToBytes(meta.openKey);
   return { master, records: await decryptVault(master) };
 }
+// このアプリが端末に保存したものをすべて消す。
+export async function eraseAll() {
+  if (dbPromise) { try { (await dbPromise).close(); } catch { /* 開けていなければそのまま消す */ } dbPromise = null; }
+  await new Promise((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(DB_NAME);
+    request.onsuccess = () => resolve();
+    request.onblocked = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}

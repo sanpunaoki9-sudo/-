@@ -1,4 +1,4 @@
-import { getMeta, initialize, unlockWithPassword, unlockWithBiometric, saveRecords, enableBiometric, disableBiometric, exportBackup, restoreBackup, changePassword, setPasswordLock, unlockWithoutPassword } from './vault.js?v=9';
+import { getMeta, initialize, unlockWithPassword, unlockWithBiometric, saveRecords, enableBiometric, disableBiometric, exportBackup, restoreBackup, changePassword, setPasswordLock, unlockWithoutPassword, eraseAll } from './vault.js?v=10';
 import { loanSummary } from './loanMath.js';
 
 const $ = id => document.getElementById(id);
@@ -13,6 +13,48 @@ let hiddenAt = 0;
 let toastTimer;
 let wari = null;
 let lockOff = false;
+let lockoutTimer;
+const LOCKOUT_KEY = 'loan-log-lockout';
+const MAX_FAILS = 3;
+const WAIT_MS = 5 * 60 * 1000;
+
+// パスワードを3回まちがえたら、5分待つか、このアプリのデータを消すかを選ばせる。
+function readLockout() {
+  try { const state = JSON.parse(localStorage.getItem(LOCKOUT_KEY)); return { fails: Number(state?.fails) || 0, until: Number(state?.until) || 0 }; }
+  catch { return { fails: 0, until: 0 }; }
+}
+function writeLockout(state) { try { localStorage.setItem(LOCKOUT_KEY, JSON.stringify(state)); } catch { /* 保存できなくても続行 */ } }
+function clearLockout() { clearInterval(lockoutTimer); try { localStorage.removeItem(LOCKOUT_KEY); } catch { /* 無視 */ } }
+function renderLockout() {
+  clearInterval(lockoutTimer);
+  let state = readLockout();
+  if (state.until && Date.now() >= state.until) { state = { fails: 0, until: 0 }; clearLockout(); }
+  const blocked = state.fails >= MAX_FAILS;
+  $('lockout').hidden = !blocked;
+  $('password').disabled = blocked;
+  $('auth-submit').disabled = blocked;
+  if (!blocked) return;
+  $('auth-error').textContent = '';
+  const waiting = state.until > Date.now();
+  $('lockout-wait').hidden = waiting;
+  const tick = () => {
+    const left = Math.ceil((state.until - Date.now()) / 1000);
+    if (left <= 0) { $('auth-error').textContent = ''; renderLockout(); return; }
+    $('lockout-message').textContent = `あと ${Math.floor(left / 60)}分${String(left % 60).padStart(2, '0')}秒 でもう一度入力できます。`;
+  };
+  if (waiting) { tick(); lockoutTimer = setInterval(tick, 1000); }
+  else $('lockout-message').textContent = `パスワードを${MAX_FAILS}回まちがえました。5分待つか、このアプリのデータを消すかを選んでください。`;
+}
+async function eraseEverything() {
+  if (!window.confirm('このアプリに保存した記録・メモ・写真をすべて消します。元に戻せません。消しますか？')) return;
+  if (!window.confirm('本当に消しますか？バックアップが無いと復元できません。')) return;
+  try {
+    await eraseAll();
+    clearLockout();
+    await showAuth();
+    toast('データを消しました。新しいパスワードを設定してください');
+  } catch(error) { toast(errorMessage(error, '消せませんでした')); }
+}
 
 // 選んだ割合は覚えておき、元金を後から入れても利息欄に反映する。
 function applyWari() {
@@ -54,10 +96,13 @@ async function showAuth() {
   $('password').autocomplete = setup ? 'new-password' : 'current-password';
   $('auth-error').textContent = '';
   $('auth-form').reset();
+  if (setup) clearLockout();
+  renderLockout();
 }
 function openApp(result) {
   master = result.master;
   records = result.records;
+  clearLockout();
   $('auth-screen').hidden = true;
   $('app').hidden = false;
   $('auth-error').textContent = '';
@@ -311,6 +356,8 @@ async function importBackup(event) {
 function wireEvents() {
   $('auth-form').addEventListener('submit', async event => {
     event.preventDefault(); $('auth-error').textContent = '';
+    renderLockout();
+    if (!$('lockout').hidden) return;
     const button = $('auth-submit'); button.disabled = true;
     try {
       const password = $('password').value;
@@ -319,8 +366,14 @@ function wireEvents() {
       if (!meta && password.length < 8) throw new Error('パスワードは8文字以上にしてください');
       openApp(meta ? await unlockWithPassword(password) : await initialize(password));
       toast(meta ? 'ロックを解除しました' : '利用を開始しました');
-    } catch(error) { $('auth-error').textContent = errorMessage(error, '開けませんでした'); }
-    finally { button.disabled = false; $('password').value = ''; $('password-confirm').value = ''; }
+    } catch(error) {
+      $('auth-error').textContent = errorMessage(error, '開けませんでした');
+      if (error?.name === 'OperationError' && await getMeta()) {
+        const state = readLockout(); state.fails += 1; state.until = 0; writeLockout(state);
+        if (state.fails < MAX_FAILS) $('auth-error').textContent = `パスワードが違います。あと${MAX_FAILS - state.fails}回まちがえると入力できなくなります。`;
+      }
+    }
+    finally { button.disabled = false; $('password').value = ''; $('password-confirm').value = ''; if (!master) renderLockout(); }
   });
   $('face-unlock').addEventListener('click', async () => { const button = $('face-unlock'); button.disabled = true; try { openApp(await unlockWithBiometric()); toast('ロックを解除しました'); } catch(error) { $('auth-error').textContent = errorMessage(error, 'Face IDで開けませんでした'); } finally { button.disabled = false; } });
   for (const id of ['calc-principal','calc-rate','calc-period','calc-mode']) $(id).addEventListener('input', updateCalculator);
@@ -344,6 +397,8 @@ function wireEvents() {
   $('import-input').addEventListener('change', importBackup);
   $('lock-button').addEventListener('click', lock);
   document.addEventListener('visibilitychange', () => { if (document.hidden) hiddenAt = Date.now(); else if (master && !lockOff && hiddenAt && Date.now() - hiddenAt > 60000) lock(); });
+  $('lockout-wait').addEventListener('click', () => { const state = readLockout(); state.until = Date.now() + WAIT_MS; writeLockout(state); renderLockout(); });
+  $('lockout-erase').addEventListener('click', eraseEverything);
   $('lock-toggle').addEventListener('click', toggleLock);
   $('password-open').addEventListener('click', () => { $('password-form').hidden = !$('password-form').hidden; $('password-error').textContent = ''; if (!$('password-form').hidden) $('new-password').focus(); });
   $('password-form').addEventListener('submit', submitNewPassword);
