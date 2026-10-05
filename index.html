@@ -14,7 +14,7 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./icon-180.png">
-  <link rel="stylesheet" href="./styles.css?v=8">
+  <link rel="stylesheet" href="./styles.css?v=9">
   <title>貸付メモ</title>
 </head>
 <body>
@@ -88,8 +88,8 @@
     <div id="due-history-wrap" hidden><h3>返済日の変更履歴</h3><div id="due-history" class="history-list"></div></div>
   </div><div class="sheet-footer"><button id="delete-record" class="button button-danger" type="button" hidden>削除</button><button class="button button-primary" type="submit">保存する</button></div></form></dialog>
 
-  <dialog id="settings-dialog" class="sheet narrow"><div class="sheet-header"><div><p class="eyebrow">SECURITY & DATA</p><h2>設定</h2></div><button id="settings-close" class="icon-button" type="button" aria-label="閉じる">×</button></div><div class="sheet-body settings-body"><div class="setting-row"><div><strong>Face IDで開く</strong><p>対応するiPhoneで、パスワードの代わりに解除します。</p></div><button id="face-toggle" class="button button-outline small" type="button">設定する</button></div><div class="setting-row"><div><strong>暗号化バックアップ</strong><p>パスワードで保護された記録をファイルに保存します。</p></div><button id="export-button" class="button button-outline small" type="button">書き出す</button></div><div class="setting-row"><div><strong>バックアップを復元</strong><p>現在の記録を置き換えます。</p></div><button id="import-button" class="button button-outline small" type="button">読み込む</button><input id="import-input" type="file" accept="application/json,.json" hidden></div><p class="hint">パスワードを忘れると記録を復元できません。Face IDの利用状況は端末とブラウザの対応によって異なります。</p></div></dialog>
+  <dialog id="settings-dialog" class="sheet narrow"><div class="sheet-header"><div><p class="eyebrow">SECURITY & DATA</p><h2>設定</h2></div><button id="settings-close" class="icon-button" type="button" aria-label="閉じる">×</button></div><div class="sheet-body settings-body"><div class="setting-row"><div><strong>Face IDで開く</strong><p>対応するiPhoneで、パスワードの代わりに解除します。</p></div><button id="face-toggle" class="button button-outline small" type="button">設定する</button></div><div class="setting-row"><div><strong>パスワードロック</strong><p id="lock-status">開くときにパスワードを求めます。</p></div><button id="lock-toggle" class="button button-outline small" type="button">オフにする</button></div><div class="setting-row"><div><strong>パスワードを再設定</strong><p>新しいパスワードに変更します。今のパスワードは不要です。</p></div><button id="password-open" class="button button-outline small" type="button">変更する</button></div><form id="password-form" class="password-form" hidden><label>新しいパスワード <input id="new-password" type="password" autocomplete="new-password" minlength="8" required placeholder="8文字以上"></label><label>もう一度入力 <input id="new-password-confirm" type="password" autocomplete="new-password" required placeholder="もう一度入力"></label><p id="password-error" class="error" role="alert"></p><button class="button button-primary full" type="submit">このパスワードに変更する</button></form><div class="setting-row"><div><strong>暗号化バックアップ</strong><p>パスワードで保護された記録をファイルに保存します。</p></div><button id="export-button" class="button button-outline small" type="button">書き出す</button></div><div class="setting-row"><div><strong>バックアップを復元</strong><p>現在の記録を置き換えます。</p></div><button id="import-button" class="button button-outline small" type="button">読み込む</button><input id="import-input" type="file" accept="application/json,.json" hidden></div><p class="hint">パスワードを忘れると記録を復元できません。Face IDの利用状況は端末とブラウザの対応によって異なります。</p></div></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="./src/app.js?v=8"></script>
+  <script type="module" src="./src/app.js?v=9"></script>
 </body>
 </html>
